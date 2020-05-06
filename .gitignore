@@ -11,6 +11,7 @@
 *.suo
 *.ncb
 *.user
+/extension_bin
 
 project.xcworkspace/
 xcuserdata/

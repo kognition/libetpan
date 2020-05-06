@@ -1,3 +1,8 @@
+## Build for Kognition
+
+You need to create a symlink path/to/libetpan/extension_bin that points to the
+folder /path/to/kognition/repo/extensions/io.kognition.imap/code/x86_64-mac
+
 ## LibEtPan
 
 The purpose of this mail library is to provide a portable, efficient framework for different kinds of mail access: IMAP, SMTP, POP and NNTP.
