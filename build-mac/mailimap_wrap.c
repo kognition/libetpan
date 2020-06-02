@@ -39,6 +39,7 @@
 #include <string.h>
 #include "mailimap.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -90,26 +91,7 @@ void __fetch_msg_string_att(struct mailimap_msg_att * atts, int pType, \
   }
 }
 
-
-LIBETPAN_EXPORT
-void mailimap_fetch_msg_uid(struct mailimap_msg_att* atts, uint32_t* rUID)
-{
-  __fetch_msg_uint32_att(atts, MAILIMAP_MSG_ATT_UID, rUID);
-}
-
-/*
- Set rContent to a CString
- */
-LIBETPAN_EXPORT
-void mailimap_fetch_msg_content(struct mailimap_msg_att* atts, char** rContent)
-{
-  
-}
-
-/*
- Concatenate pString to xListString, separated by a comma
- */
-void __concatenate(char *pString, char **xList)
+void __concatWithDel(char *pString, const char *pDel, char **xList)
 {
   size_t tItemLen = strlen(pString);
   size_t tOffset = 0;
@@ -121,15 +103,105 @@ void __concatenate(char *pString, char **xList)
   {
     size_t tExistingLen = 0;
     tExistingLen = strlen(*xList);
-    tList = (char*)realloc((void*)*xList, tExistingLen + tItemLen + 2);
-    tList[tExistingLen] = ',';
-    tOffset = tExistingLen + 1;
+    size_t tDelLen = strlen(pDel);
+    
+    tList = (char*)realloc((void*)*xList, tExistingLen + tItemLen + tDelLen + 1);
+    
+    if (tDelLen > 0)
+    {
+      strcpy(&(tList[tExistingLen]), pDel);
+    }
+    tOffset = tExistingLen + tDelLen;
   }
   
   memcpy(tList + tOffset, pString, tItemLen);
   tList[tOffset + tItemLen] = '\0';
   *xList = tList;
 }
+
+
+/*
+ Concatenate pString to xListString, separated by a comma
+ */
+void __concatToList(char *pString, char **xList)
+{
+  __concatWithDel(pString, ",", xList);
+}
+
+void __concat(char *pString, char **xString)
+{
+  __concatWithDel(pString, "", xString);
+}
+
+
+char *__uintListToCString(clist *pList)
+{
+  clistiter *cur;
+  size_t tStringLength = 0;
+  char *tStringList = NULL;
+  
+  for (cur = clist_begin(pList); cur != NULL; cur = clist_next(cur))
+  {
+    uint32_t *tContent = clist_content(cur);
+    int tContentLength = snprintf(NULL, 0,"%u",*tContent);
+    
+    size_t tNewLength;
+    tNewLength = tStringLength + tContentLength;
+    
+    // Add one extra char for a comma
+    if (tStringList != NULL)
+      tNewLength++;
+    
+    tStringList = (char*)realloc(tStringList, tNewLength + 1);
+    
+    if (tStringList == NULL)
+      continue;
+    
+    // Append a comma at the end of the previous string
+    char *tDest = tStringList;
+    if (tStringLength != 0)
+    {
+      tStringList[tStringLength] = ',';
+      tDest = (char *)(tStringList + tStringLength + 1);
+    }
+    
+    int tWritten = snprintf(tDest, tContentLength + 1, "%u", *tContent);
+    
+    tStringLength = tNewLength;
+    if (tWritten != tContentLength)
+      continue;
+  }
+  
+  return tStringList;
+}
+
+/*
+ * Concatenate the flag to the CString xString
+ */
+void __concatenateFlags(struct mailimap_flag *pFlag, char** xString)
+{
+  if (pFlag != NULL)
+  {
+    if (pFlag->fl_type == MAILIMAP_FLAG_ANSWERED)
+      __concatToList("Answered", xString);
+    else if (pFlag->fl_type == MAILIMAP_FLAG_FLAGGED)
+      __concatToList("Flagged", xString);
+    else if (pFlag->fl_type == MAILIMAP_FLAG_DELETED)
+      __concatToList("Deleted", xString);
+    else if (pFlag->fl_type == MAILIMAP_FLAG_SEEN)
+      __concatToList("Seen", xString);
+    else if (pFlag->fl_type == MAILIMAP_FLAG_DRAFT)
+      __concatToList("Draft", xString);
+    else if (pFlag->fl_type == MAILIMAP_FLAG_KEYWORD || \
+             pFlag->fl_type == MAILIMAP_FLAG_EXTENSION)
+      __concatToList((char*)(pFlag->fl_data.fl_keyword), xString);
+  }
+}
+
+
+//////////
+// Exported functions
+//////////
 
 int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list* pMailbox, \
                                    char** rName, char** rFlags, char **rDelimiter)
@@ -144,13 +216,14 @@ int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list* pMailbox, \
     if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_ERROR)
       return MAILIMAP_ERROR_LIST;
     else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_MARKED)
-      __concatenate("Marked", &tFlagList);
+      __concatToList("Marked", &tFlagList);
     else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_NOSELECT)
-      __concatenate("Noselect", &tFlagList);
+      __concatToList("Noselect", &tFlagList);
     else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_UNMARKED)
-      __concatenate("Unmarked", &tFlagList);
+      __concatToList("Unmarked", &tFlagList);
   }
-  else if (tFlags->mbf_oflags != NULL)
+  
+  if (tFlags->mbf_oflags != NULL)
   {
     clistiter* iter = clist_begin(tFlags->mbf_oflags);
     for (; iter != NULL && tErrorCode == MAILIMAP_NO_ERROR; iter = clist_next(iter))
@@ -163,9 +236,9 @@ int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list* pMailbox, \
       if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_ERROR)
         tErrorCode = MAILIMAP_ERROR_LIST;
       else if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_NOINFERIORS)
-        __concatenate("NoInferior", &tFlagList);
+        __concatToList("NoInferior", &tFlagList);
       else if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_FLAG_EXT)
-        __concatenate(tOflag->of_flag_ext, &tFlagList);
+        __concatToList(tOflag->of_flag_ext, &tFlagList);
       else
         tErrorCode = MAILIMAP_ERROR_LIST;
     }
@@ -255,24 +328,8 @@ int mailimap_fetch_mailbox_info(struct mailimap* pSession,
         for (cur = clist_begin(tInfo->sel_flags->fl_list); \
              cur != NULL; cur = clist_next(cur))
         {
-          struct mailimap_flag* tFlag = (struct mailimap_flag*) clist_content(cur);
-          
-          if (tFlag != NULL)
-          {
-            if (tFlag->fl_type == MAILIMAP_FLAG_ANSWERED)
-              __concatenate("Answered", &tFlagString);
-            else if (tFlag->fl_type == MAILIMAP_FLAG_FLAGGED)
-              __concatenate("Flagged", &tFlagString);
-            else if (tFlag->fl_type == MAILIMAP_FLAG_DELETED)
-              __concatenate("Deleted", &tFlagString);
-            else if (tFlag->fl_type == MAILIMAP_FLAG_SEEN)
-              __concatenate("Seen", &tFlagString);
-            else if (tFlag->fl_type == MAILIMAP_FLAG_DRAFT)
-              __concatenate("Draft", &tFlagString);
-            else if (tFlag->fl_type == MAILIMAP_FLAG_KEYWORD || \
-                     tFlag->fl_type == MAILIMAP_FLAG_EXTENSION)
-              __concatenate((char*)(tFlag->fl_data.fl_keyword), &tFlagString);
-          }
+          __concatenateFlags((struct mailimap_flag*) clist_content(cur),
+                            &tFlagString);
         }
         
         *rFlags = tFlagString;
@@ -374,4 +431,245 @@ int mailimap_fetch_mailbox_status(struct mailimap* pSession,
     clist_free(tStatusAttList);
   
   return tError;
+}
+
+
+int mailimap_run_search(struct mailimap *pSession,
+                        struct mailimap_search_key *pSearchKeys,
+                        char **rList)
+{
+  clist *tResults = NULL;
+  int tCode;
+  char *tStringList = NULL;
+  
+  tCode = mailimap_search(pSession, "UTF-8", pSearchKeys, &tResults);
+  
+  if (tCode == MAILIMAP_NO_ERROR)
+  {
+    tStringList = __uintListToCString(tResults);
+    clist_free(tResults);
+  }
+  
+  *rList = tStringList;
+  return tCode;
+}
+
+
+int mailimap_run_uid_search(struct mailimap *pSession,
+                            struct mailimap_search_key *pSearchKeys,
+                            char **rList)
+{
+  clist *tResults = NULL;
+  int tCode;
+  char *tStringList = NULL;
+  
+  tCode = mailimap_uid_search(pSession, "UTF-8", pSearchKeys, &tResults);
+  
+  if (tCode == MAILIMAP_NO_ERROR)
+  {
+    tStringList = __uintListToCString(tResults);
+    clist_free(tResults);
+  }
+  
+  *rList = tStringList;
+  return tCode;
+}
+
+
+void __extractEmailInfo(struct mailimap_msg_att * pMsgAtt,
+                        struct mailimap_email_details* xDetails,
+                        char **xError)
+{
+  clistiter *cur = clist_begin(pMsgAtt->att_list);
+  for (; cur != NULL; cur = clist_next(cur))
+  {
+    struct mailimap_msg_att_item *tItem = (struct mailimap_msg_att_item*) clist_content(cur);
+    
+    if (tItem->att_type == MAILIMAP_MSG_ATT_ITEM_ERROR)
+    {
+      __concatWithDel("parse error!", "\n", xError);
+    }
+    else if (tItem->att_type == MAILIMAP_MSG_ATT_ITEM_STATIC)
+    {
+      struct mailimap_msg_att_static *tAtt = tItem->att_data.att_static;
+      
+      if (tAtt->att_type == MAILIMAP_MSG_ATT_ENVELOPE)
+        xDetails->ed_subject = tAtt->att_data.att_env->env_subject;
+      else if (tAtt->att_type == MAILIMAP_MSG_ATT_RFC822_SIZE)
+        xDetails->ed_size = tAtt->att_data.att_rfc822_size;
+      else if (tAtt->att_type == MAILIMAP_MSG_ATT_INTERNALDATE)
+        xDetails->ed_internalDate = tAtt->att_data.att_internal_date;
+      else if (tAtt->att_type == MAILIMAP_MSG_ATT_UID)
+        xDetails->ed_uid = tAtt->att_data.att_uid;
+      else
+      {
+        __concatWithDel("Non-requested static type: ", "\n", xError);
+        char tCode[3];
+        if (snprintf(tCode, 3, "%i", tAtt->att_type) != 3)
+          tCode[2] = '\0';
+        __concat(tCode, xError);
+      }
+    }
+    else if (tItem->att_type == MAILIMAP_MSG_ATT_ITEM_DYNAMIC)
+    {
+      __concatWithDel("Non requested dynamic att", "\n", xError);
+    }
+    else if (tItem->att_type == MAILIMAP_MSG_ATT_ITEM_EXTENSION)
+    {
+      __concatWithDel("This is external stuff, nope!", "\n", xError);
+    }
+  }
+}
+
+void __msg_att_handler(struct mailimap_msg_att * pMsgAtt, void * pContext)
+{
+  struct mailimap_msg_att_fetch_callback *tCallback =
+                          (struct mailimap_msg_att_fetch_callback*)pContext;
+  
+  if (tCallback == NULL)
+    return;
+  
+  clistiter *cur = NULL;
+  
+  if (pMsgAtt != NULL)
+  {
+    cur = clist_begin(pMsgAtt->att_list);
+  }
+  
+  if (tCallback->fc_type == MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL)
+  {
+    struct mailimap_email_details tDetails;
+    char *tError = NULL;
+    __extractEmailInfo(pMsgAtt, &tDetails, &tError);
+    
+    int tDateLength;
+    tDateLength = snprintf(NULL, 0, "%u,%u,%u,%u,%u,%u,%u",
+                           tDetails.ed_internalDate->dt_year,
+                           tDetails.ed_internalDate->dt_month,
+                           tDetails.ed_internalDate->dt_day,
+                           tDetails.ed_internalDate->dt_hour,
+                           tDetails.ed_internalDate->dt_min,
+                           tDetails.ed_internalDate->dt_sec,
+                           tDetails.ed_internalDate->dt_zone);
+    
+    char *tDateItems = NULL;
+    if (tDateLength > 0)
+    {
+      tDateItems = (char*)malloc(tDateLength + 1);
+    }
+    
+    if (tDateItems != NULL)
+    {
+      if (snprintf(tDateItems, tDateLength + 1, "%u,%u,%u,%u,%u,%u,%u",
+                   tDetails.ed_internalDate->dt_year,
+                   tDetails.ed_internalDate->dt_month,
+                   tDetails.ed_internalDate->dt_day,
+                   tDetails.ed_internalDate->dt_hour,
+                   tDetails.ed_internalDate->dt_min,
+                   tDetails.ed_internalDate->dt_sec,
+                   tDetails.ed_internalDate->dt_zone) != tDateLength)
+      {
+        __concatWithDel("error in formatting internal date", "\n", &tError);
+      }
+    }
+    
+    tCallback->fc_callback.fc_email(tDetails.ed_uid, tDetails.ed_size,
+                                    tDetails.ed_subject, tDateItems, tError,
+                                    *(uint32_t*)(tCallback->fc_context));
+    
+    free(tDateItems);
+    free(tError);
+  }
+}
+
+void progress_fun(size_t current, size_t maximum, void * context)
+{
+  fprintf(stdout, "item %zu/%zu\n", current, maximum);
+}
+
+
+int __add_att_list(struct mailimap_fetch_type**xFetchType,
+                   struct mailimap_fetch_att *(new_att)(void))
+{
+  int tCode = MAILIMAP_NO_ERROR;
+  struct mailimap_fetch_type* tFetchType = NULL;
+  
+  if (*xFetchType == NULL)
+  {
+    tFetchType = mailimap_fetch_type_new_fetch_att_list_empty();
+    
+    if (tFetchType == NULL)
+      tCode = MAILIMAP_ERROR_MEMORY;
+    else
+      *xFetchType = tFetchType;
+  }
+  else
+  {
+    tFetchType = *xFetchType;
+  }
+  
+  if (tFetchType != NULL)
+  {
+    struct mailimap_fetch_att* tAtt;
+    tAtt = new_att();
+    
+    if (tAtt == NULL)
+    {
+      tCode = MAILIMAP_ERROR_MEMORY;
+    }
+    else
+    {
+      tCode = mailimap_fetch_type_new_fetch_att_list_add(tFetchType, tAtt);
+    }
+  }
+  
+  return tCode;
+}
+
+
+int mailimap_fetch_email_details(mailimap * pSession,
+                                 struct mailimap_set *pSet,
+                                 fetch_email_callback *pCallback,
+                                 uint32_t pID)
+{
+  int tCode;
+  clist * fetch_list = NULL;
+  
+  struct mailimap_email_details tEmailInfo;
+  tEmailInfo.ed_subject = NULL;
+  tEmailInfo.ed_internalDate = NULL;
+  tEmailInfo.ed_size = 0;
+  
+  struct mailimap_msg_att_fetch_callback tCallback;
+  tCallback.fc_type = MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL;
+  tCallback.fc_callback.fc_email = pCallback;
+  tCallback.fc_context = &pID;
+  
+  // Even though unused, a progress callback function must be added too, so that
+  // msg_att_handler gets called when the response is parsed
+  mailimap_set_progress_callback(pSession, NULL, &progress_fun, NULL);
+  mailimap_set_msg_att_handler(pSession, &__msg_att_handler, (void*)(&tCallback));
+  
+  struct mailimap_fetch_type *tFetchType = NULL;
+  tCode = __add_att_list(&tFetchType, &mailimap_fetch_att_new_envelope);
+  
+  if (tCode == MAILIMAP_NO_ERROR)
+    tCode = __add_att_list(&tFetchType, &mailimap_fetch_att_new_internaldate);
+  
+  if (tCode == MAILIMAP_NO_ERROR)
+    tCode = __add_att_list(&tFetchType, &mailimap_fetch_att_new_rfc822_size);
+  
+  if (tCode == MAILIMAP_NO_ERROR)
+    tCode = mailimap_uid_fetch(pSession, pSet, tFetchType, &fetch_list);
+  
+  mailimap_fetch_type_free(tFetchType);
+  
+  // Remove callback function pointers
+  mailimap_set_progress_callback(pSession, NULL, NULL, NULL);
+  mailimap_set_msg_att_handler(pSession, NULL, NULL);
+  
+  if (tCode == MAILIMAP_NO_ERROR)
+    mailimap_fetch_list_free(fetch_list);
+  
+  return tCode;
 }

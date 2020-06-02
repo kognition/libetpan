@@ -60,6 +60,34 @@ struct mailimap_status_bridge {
   uint32_t sb_uidvalidity;
 };
 
+struct mailimap_email_details {
+  char *ed_subject;
+  struct mailimap_date_time *ed_internalDate;
+  uint32_t ed_size;
+  uint32_t ed_uid;
+};
+
+typedef void fetch_email_callback(uint32_t pUID, uint32_t pSize,
+                                  char *pSubject,
+                                  char *pInternalDate,
+                                  char *pError,
+                                  uint32_t pContext);
+  
+enum {
+  MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL
+};
+
+/*
+ Type amongst the enum above
+*/
+struct mailimap_msg_att_fetch_callback {
+  int fc_type;
+  void *fc_context;
+  union {
+    fetch_email_callback *fc_email;
+  } fc_callback;
+};
+
 /*
  mailimap_fetch_mailbox_details()
  This function fetches details of a mailbox obtained from mailimap_list
@@ -93,11 +121,55 @@ int mailimap_fetch_mailbox_status(struct mailimap* pSession,
  
  @param pMailbox  Mailbox name. If empty, fetches info of the current mailbox
  @param rInfo     Selection info. Must not be freed
+ @param rFlags    List of attributes and flags attached of the mailbox
 */
+LIBETPAN_EXPORT
 int mailimap_fetch_mailbox_info(struct mailimap* pSession,
                                 const char* pMailbox,
                                 struct mailimap_mailbox_info_bridge* rInfo,
                                 char **rFlags);
+
+/*
+ mailimap_run_uid_search()
+ This function runs a search with the search keys and returns a
+ comma-delimited list of matching UIDs
+ 
+ @param pSearchKeys Search keys generated with mailimap_ API
+ @param rList       CString - owned by the caller
+*/
+LIBETPAN_EXPORT
+int mailimap_run_uid_search(struct mailimap *pSession,
+                            struct mailimap_search_key *pSearchKeys,
+                            char **rList);
+  
+/*
+ mailimap_run_search()
+ This function runs a search with the search keys and returns a
+ comma-delimited list of matching IDs (not UIDs)
+ 
+ @param pSearchKeys Search keys generated with mailimap_ API
+ @param rList       CString - owned by the caller
+*/
+LIBETPAN_EXPORT
+int mailimap_run_search(struct mailimap *pSession,
+                        struct mailimap_search_key *pSearchKeys,
+                        char **rList);
+
+/*
+ mailimap_fetch_email_details()
+ This function fetches details of a list of emails
+ It calls the callback function each time an email is parsed from the response
+ 
+ @param   pSet: set of email generated with mailimap_set_* API
+ @param   pCallback: function called every time an email attribute set is parsed
+                     from the response
+ @param   pContext: integer that will be passed to the callback
+*/
+LIBETPAN_EXPORT
+int mailimap_fetch_email_details(mailimap * pSession,
+                                 struct mailimap_set *pSet,
+                                 fetch_email_callback *pCallback,
+                                 uint32_t pContext);
 
 #ifdef __cplusplus
 }
