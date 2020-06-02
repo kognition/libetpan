@@ -11,7 +11,7 @@
 *.suo
 *.ncb
 *.user
-/extension_bin
+/kog_imap_lcb_code
 
 project.xcworkspace/
 xcuserdata/

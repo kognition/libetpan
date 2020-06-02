@@ -1,7 +1,16 @@
 ## Build for Kognition
 
-You need to create a symlink path/to/libetpan/extension_bin that points to the
-folder /path/to/kognition/repo/extensions/io.kognition.imap/code/x86_64-mac
+You need to create a symlink path/to/libetpan/kog_imap_lcb_code that points to
+the folder /path/to/kognition/repo/extensions/io.kognition.imap/code/x86_64-mac
+
+This ensures that after the dynamic lib is compiled, it is directly copied into
+the code section of the LCB library.
+
+Note if the folder cannot be found, the build will fail (for Mac builds at
+the moment, at least).
+
+Instructions on how to build can be found further down in the
+**Build Instructions**
 
 ## LibEtPan
 
@@ -47,7 +56,10 @@ You can use flag --with-poll for using poll() instead of select() for checking c
 - Download Xcode
 - Open `build-mac/libetpan.xcodeproj`
 - Choose the correct target "static libetpan" for Mac or "libetpan ios" for iOS.
-- Build
+- Build either the target _Dynamic libetpan_ or _test_: either will build the dylib
+
+The target _test_ will run the script _tests/imap-wraper.c_, which is intended
+to check that segfaults and memory leaks are not happening.
 
 ### Setup a Mac project
 

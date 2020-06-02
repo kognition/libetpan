@@ -791,7 +791,7 @@
 		BE6705E02459CC65007759CA /* Copy Files */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "$(SRCROOT)/../extension_bin";
+			dstPath = "$(SRCROOT)/../kog_imap_lcb_code";
 			dstSubfolderSpec = 0;
 			files = (
 				BE6705E12459CCC1007759CA /* libetpan.dylib in Copy Files */,
@@ -2218,7 +2218,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"$BUILT_PRODUCTS_DIR/include\"\nrsync -aL \"$SRCROOT/../include/libetpan/\" \"$BUILT_PRODUCTS_DIR/include/libetpan/\"";
+			shellScript = "mkdir -p \"$BUILT_PRODUCTS_DIR/include\"\nrsync -aL \"$SRCROOT/../include/libetpan/\" \"$BUILT_PRODUCTS_DIR/include/libetpan/\"\nDEST=\"$(cd $SRCROOT/..; pwd)/kog_imap_lcb_code\"\nif [ ! -d \"$DEST\" ]; then\n  echo \"There must be a link to the kognition repo, so that the build is copied directly in the LCB library code.\"\n  echo \"  ln -s /path/to/kognition/repo/extensions/io.kognition.imap/code/x86_64-mac $DEST\"\n  exit 1\nfi";
 		};
 		C6635C3316DFEFE00066276E /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
