@@ -61,20 +61,30 @@ struct mailimap_status_bridge {
 };
 
 struct mailimap_email_details {
-  char *ed_subject;
-  struct mailimap_date_time *ed_internalDate;
   uint32_t ed_size;
   uint32_t ed_uid;
+  char *ed_subject;
+  struct mailimap_date_time *ed_internalDate;
+  struct
+  {
+    size_t ed_size;
+    char *ed_content;
+  } ed_body;
 };
 
-typedef void fetch_email_callback(uint32_t pUID, uint32_t pSize,
+typedef void fetch_email_details_callback(uint32_t pUID, uint32_t pSize,
                                   char *pSubject,
                                   char *pInternalDate,
                                   char *pError,
                                   uint32_t pContext);
   
+typedef void fetch_email_body_callback(uint32_t pUID, size_t pSize,
+                                       char *pBody, char *pError,
+                                       uint32_t pContext);
+  
 enum {
-  MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL
+  MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL_DETAILS,
+  MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL_BODY
 };
 
 /*
@@ -84,9 +94,19 @@ struct mailimap_msg_att_fetch_callback {
   int fc_type;
   void *fc_context;
   union {
-    fetch_email_callback *fc_email;
+    fetch_email_details_callback *fc_email_details;
+    fetch_email_body_callback *fc_email_body;
   } fc_callback;
 };
+  
+  
+  
+/*
+ this function creats a condition structure to match messages with flag
+ */
+LIBETPAN_EXPORT
+struct mailimap_search_key *
+mailimap_search_key_new_flag(const char *flag);
 
 /*
  mailimap_fetch_mailbox_details()
@@ -168,8 +188,24 @@ int mailimap_run_search(struct mailimap *pSession,
 LIBETPAN_EXPORT
 int mailimap_fetch_email_details(mailimap * pSession,
                                  struct mailimap_set *pSet,
-                                 fetch_email_callback *pCallback,
+                                 fetch_email_details_callback *pCallback,
                                  uint32_t pContext);
+
+/*
+mailimap_fetch_email_body
+ This function fetches the content of a set of emails
+ It calls back the function each time an email is parsed from the response
+ 
+ @param   pSet: set of emails generated with mailimap_set_* API
+ @param   pCallback: function called everytime an email body is parsed from
+                     the response
+ @param   pContext: integer that will be passed to the callback
+*/
+LIBETPAN_EXPORT
+int mailimap_fetch_email_body(mailimap *pSession,
+                              struct mailimap_set *pSet,
+                              fetch_email_body_callback *pCallback,
+                              uint32_t pContent);
 
 #ifdef __cplusplus
 }

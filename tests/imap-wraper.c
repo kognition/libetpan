@@ -399,6 +399,44 @@ void __runSearch(struct mailimap *pSession,
   }
   
   mailimap_search_key_free(tKey);
+  
+  
+  //////
+  
+  
+  tKey = NULL;
+  r = mailimap_select(pSession, "INBOX.Google");
+  
+  if (!check_error(r, "mailimap_select INBOX.Google"))
+    return;
+  
+  tKey = mailimap_search_key_new_flag("FLAGGED");
+  
+  if (TestAssert("mailimap_search_key_new_flag succeeded", tKey != NULL))
+  {
+    char *tResults = NULL;
+    r = search(pSession, tKey, &tResults);
+    
+    if (check_error(r, pFuncName))
+    {
+      if (TestAssert("results are not empty", tResults != NULL))
+      {
+        _print(tResults);
+        TestCompareUInts((uint32_t)strlen(tResults), 1, "results returned");
+        free(tResults);
+      }
+    }
+  }
+  
+  mailimap_search_key_free(tKey);
+  tKey = NULL;
+  
+  tKey = mailimap_search_key_new_flag("WRONG!!!!");
+  TestAssert("mailimap_search_key_new_flag returned NULL for invalid name",
+             tKey == NULL);
+  
+  if (tKey != NULL)
+    mailimap_search_key_free(tKey);
 }
 
 void test_search(struct mailimap *pSession)
@@ -456,9 +494,59 @@ void _fetch_email_callback(uint32_t pUID, uint32_t pSize, char *pSubject,
   TestCompareUInts(pContext, sContext, "Context");
   __fetch_add_item();
 }
-          
 
-void test_fetch_email(struct mailimap *pSession)
+void _fetch_email_body_callback(uint32_t pUID, size_t pSize,
+                                char *pContent, char *pError, uint32_t pContext)
+{
+  TestCompareUIntsNot(pUID, 0, "UID returned");
+  TestCompareUIntsNot((uint32_t)pSize, 0, "Size returned");
+  
+  TestAssert("No error returned", pError == NULL);
+  if (pError != NULL)
+    fprintf(stdout, "Error returned: %s\n", pError);
+  
+  TestCompareUInts(pContext, sContext, "Context");
+  __fetch_add_item();
+}
+          
+void test_fetch_email_body(struct mailimap *pSession)
+{
+  struct mailimap_set *tSet = mailimap_set_new_interval(5,7);
+  
+  if (tSet == NULL)
+  {
+    _print("Error!");
+    return;
+  }
+  
+  int r;
+  r = mailimap_select(pSession, "INBOX");
+  
+  TestAssert("SELECT succeeded", r == MAILIMAP_NO_ERROR);
+  
+  if (r != MAILIMAP_NO_ERROR)
+    return;
+  
+  __fetch_reset_count();
+  
+  r = mailimap_fetch_email_body(pSession, tSet, &_fetch_email_body_callback, sContext);
+  TestAssert("test_fetch_email_body succeeded", r == MAILIMAP_NO_ERROR);
+  TestCompareUInts(__fetch_get_count(), 3, "UIDs fetch");
+  mailimap_set_free(tSet);
+  
+  // Use interval set
+  tSet = mailimap_set_new_interval(1, 7);
+  
+  if (tSet == NULL)
+  {
+    _print("Error!");
+    return;
+  }
+  
+}
+
+
+void test_fetch_email_details(struct mailimap *pSession)
 {
   struct mailimap_set* tSet = mailimap_set_new_single(6);
   
@@ -537,8 +625,9 @@ int main(int argc, char **argv)
   r = mailimap_login(imap, "quality@kognition.io", "Qr3}b9l3,s=t");
   check_error(r, "could not login");
   
-  test_fetch_email(imap);
-  
+  test_fetch_email_body(imap);
+  test_fetch_email_details(imap);
+
   test_mailbox_list(imap, "", 1);
   test_mailbox_list(imap, "INBOX", 9);
 

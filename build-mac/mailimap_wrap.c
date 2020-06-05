@@ -203,6 +203,57 @@ void __concatenateFlags(struct mailimap_flag *pFlag, char** xString)
 // Exported functions
 //////////
 
+typedef struct search_flag
+{
+  const char* sf_name;
+  int sf_value;
+} search_flag;
+
+const search_flag search_flag_map[] =
+{
+  {"ANSWERED", MAILIMAP_SEARCH_KEY_ANSWERED},
+  {"DELETED", MAILIMAP_SEARCH_KEY_DELETED},
+  {"DRAFT", MAILIMAP_SEARCH_KEY_DRAFT},
+  {"FLAGGED", MAILIMAP_SEARCH_KEY_FLAGGED},
+  {"NEW", MAILIMAP_SEARCH_KEY_NEW},
+  {"RECENT", MAILIMAP_SEARCH_KEY_RECENT},
+  {"OLD", MAILIMAP_SEARCH_KEY_OLD},
+  {"SEEN", MAILIMAP_SEARCH_KEY_SEEN},
+  {"UNANSWERED", MAILIMAP_SEARCH_KEY_UNANSWERED},
+  {"UNDELETED", MAILIMAP_SEARCH_KEY_UNDELETED},
+  {"UNDRAFT", MAILIMAP_SEARCH_KEY_UNDRAFT},
+  {"UNFLAGGED", MAILIMAP_SEARCH_KEY_UNFLAGGED},
+  {"UNSEEN", MAILIMAP_SEARCH_KEY_UNSEEN}
+};
+
+LIBETPAN_EXPORT
+struct mailimap_search_key *
+mailimap_search_key_new_flag(const char *flag)
+{
+  struct mailimap_search_key *tKey = NULL;
+  
+  uint32_t tElements = sizeof(search_flag_map) / sizeof(search_flag_map[0]);
+  
+  int tType = -1;
+  for (uint32_t i = 0; i < tElements && tType == -1; i++)
+  {
+    if (strcmp(search_flag_map[i].sf_name, flag) == 0)
+      tType = search_flag_map[i].sf_value;
+  }
+  
+  if (tType != -1)
+  {
+    return mailimap_search_key_new(tType, NULL, NULL,
+                                   NULL, NULL, NULL, NULL, NULL, NULL,
+                                   NULL, NULL, NULL, NULL, NULL,
+                                   NULL, 0, NULL,
+                                   NULL, NULL, NULL, NULL, NULL,
+                                   0, NULL, NULL, NULL);
+  }
+  
+  return NULL;
+}
+
 int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list* pMailbox, \
                                    char** rName, char** rFlags, char **rDelimiter)
 {
@@ -501,6 +552,11 @@ void __extractEmailInfo(struct mailimap_msg_att * pMsgAtt,
         xDetails->ed_internalDate = tAtt->att_data.att_internal_date;
       else if (tAtt->att_type == MAILIMAP_MSG_ATT_UID)
         xDetails->ed_uid = tAtt->att_data.att_uid;
+      else if (tAtt->att_type == MAILIMAP_MSG_ATT_BODY_SECTION)
+      {
+        xDetails->ed_body.ed_size = tAtt->att_data.att_body_section->sec_length;
+        xDetails->ed_body.ed_content =  tAtt->att_data.att_body_section->sec_body_part;
+      }
       else
       {
         __concatWithDel("Non-requested static type: ", "\n", xError);
@@ -517,6 +573,10 @@ void __extractEmailInfo(struct mailimap_msg_att * pMsgAtt,
     else if (tItem->att_type == MAILIMAP_MSG_ATT_ITEM_EXTENSION)
     {
       __concatWithDel("This is external stuff, nope!", "\n", xError);
+    }
+    else
+    {
+      __concatWithDel("That shouldn't happen!", "\n", xError);
     }
   }
 }
@@ -536,7 +596,7 @@ void __msg_att_handler(struct mailimap_msg_att * pMsgAtt, void * pContext)
     cur = clist_begin(pMsgAtt->att_list);
   }
   
-  if (tCallback->fc_type == MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL)
+  if (tCallback->fc_type == MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL_DETAILS)
   {
     struct mailimap_email_details tDetails;
     char *tError = NULL;
@@ -573,14 +633,33 @@ void __msg_att_handler(struct mailimap_msg_att * pMsgAtt, void * pContext)
       }
     }
     
-    tCallback->fc_callback.fc_email(tDetails.ed_uid, tDetails.ed_size,
+    tCallback->fc_callback.fc_email_details(tDetails.ed_uid, tDetails.ed_size,
                                     tDetails.ed_subject, tDateItems, tError,
                                     *(uint32_t*)(tCallback->fc_context));
     
     free(tDateItems);
     free(tError);
   }
+  else if (tCallback->fc_type == MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL_BODY)
+  {
+    struct mailimap_email_details tDetails;
+    tDetails.ed_body.ed_content = NULL;
+    tDetails.ed_subject = NULL;
+    tDetails.ed_size = 0;
+    tDetails.ed_uid = 0;
+    tDetails.ed_internalDate = NULL;
+    
+    char *tError = NULL;
+    __extractEmailInfo(pMsgAtt, &tDetails, &tError);
+    
+    tCallback->fc_callback.fc_email_body(tDetails.ed_uid,
+                                         tDetails.ed_body.ed_size,
+                                         tDetails.ed_body.ed_content,
+                                         tError,
+                                         *(uint32_t*)tCallback->fc_context);
+  }
 }
+
 
 void progress_fun(size_t current, size_t maximum, void * context)
 {
@@ -629,7 +708,7 @@ int __add_att_list(struct mailimap_fetch_type**xFetchType,
 
 int mailimap_fetch_email_details(mailimap * pSession,
                                  struct mailimap_set *pSet,
-                                 fetch_email_callback *pCallback,
+                                 fetch_email_details_callback *pCallback,
                                  uint32_t pID)
 {
   int tCode;
@@ -641,8 +720,8 @@ int mailimap_fetch_email_details(mailimap * pSession,
   tEmailInfo.ed_size = 0;
   
   struct mailimap_msg_att_fetch_callback tCallback;
-  tCallback.fc_type = MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL;
-  tCallback.fc_callback.fc_email = pCallback;
+  tCallback.fc_type = MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL_DETAILS;
+  tCallback.fc_callback.fc_email_details = pCallback;
   tCallback.fc_context = &pID;
   
   // Even though unused, a progress callback function must be added too, so that
@@ -668,8 +747,71 @@ int mailimap_fetch_email_details(mailimap * pSession,
   mailimap_set_progress_callback(pSession, NULL, NULL, NULL);
   mailimap_set_msg_att_handler(pSession, NULL, NULL);
   
-  if (tCode == MAILIMAP_NO_ERROR)
+  if (fetch_list != NULL)
     mailimap_fetch_list_free(fetch_list);
+  
+  return tCode;
+}
+
+
+int mailimap_fetch_email_body(mailimap *pSession,
+                              struct mailimap_set *pSet,
+                              fetch_email_body_callback *pCallback,
+                              uint32_t pID)
+{
+  int tCode = MAILIMAP_NO_ERROR;
+  
+  struct mailimap_email_details tEmailInfo;
+  tEmailInfo.ed_subject = NULL;
+  tEmailInfo.ed_internalDate = NULL;
+  tEmailInfo.ed_size = 0;
+  
+  struct mailimap_msg_att_fetch_callback tCallback;
+  tCallback.fc_type = MAILIMAP_MSG_ATT_CALLBACK_FETCH_EMAIL_BODY;
+  tCallback.fc_callback.fc_email_body = pCallback;
+  tCallback.fc_context = &pID;
+  
+  // Even though unused, a progress callback function must be added too, so that
+  // msg_att_handler gets called when the response is parsed
+  mailimap_set_progress_callback(pSession, NULL, &progress_fun, NULL);
+  mailimap_set_msg_att_handler(pSession, &__msg_att_handler, (void*)(&tCallback));
+  
+  struct mailimap_section* tSection = mailimap_section_new(NULL);
+  if (tSection == NULL)
+    return MAILIMAP_ERROR_MEMORY;
+  
+  struct mailimap_fetch_att *tFetchAtt = NULL;
+  tFetchAtt = mailimap_fetch_att_new_body_peek_section(tSection);
+  
+  if (tFetchAtt == NULL)
+  {
+    mailimap_section_free(tSection);
+    return MAILIMAP_ERROR_MEMORY;
+  }
+  
+  struct mailimap_fetch_type *tFetchType = NULL;
+  tFetchType = mailimap_fetch_type_new_fetch_att_list_empty();
+  
+  if (tFetchType == NULL)
+  {
+    mailimap_fetch_att_free(tFetchAtt);
+    return MAILIMAP_ERROR_MEMORY;
+  }
+  
+  tCode = mailimap_fetch_type_new_fetch_att_list_add(tFetchType, tFetchAtt);
+  
+  clist *tFetchList = NULL;
+  if (tCode == MAILIMAP_NO_ERROR)
+    tCode = mailimap_uid_fetch(pSession, pSet, tFetchType, &tFetchList);
+  
+  mailimap_fetch_type_free(tFetchType);
+  
+  // Remove callback function pointers
+  mailimap_set_progress_callback(pSession, NULL, NULL, NULL);
+  mailimap_set_msg_att_handler(pSession, NULL, NULL);
+  
+  if (tFetchList != NULL)
+    mailimap_fetch_list_free(tFetchList);
   
   return tCode;
 }
