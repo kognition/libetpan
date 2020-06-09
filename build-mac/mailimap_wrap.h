@@ -102,11 +102,14 @@ struct mailimap_msg_att_fetch_callback {
   
   
 /*
- this function creats a condition structure to match messages with flag
+ this function creats a condition structure to match messages with pFlag
+ Note that the pFlag must be all in capital letters
+ 
+ @return  a search key on success, NULL on failure
  */
 LIBETPAN_EXPORT
 struct mailimap_search_key *
-mailimap_search_key_new_flag(const char *flag);
+mailimap_search_key_new_flag(const char *pFlag);
 
 /*
  mailimap_fetch_mailbox_details()
@@ -119,8 +122,8 @@ mailimap_search_key_new_flag(const char *flag);
  @return the return code is one of MAILIMAP_NO_ERROR or MAILIMAP_ERROR_XXX
  */
 LIBETPAN_EXPORT
-int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list* pMailbox,
-                                     char** rName, char** rFlags, char **rDelimiter);
+int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list *pMailbox,
+                                     char **rName, char **rFlags, char **rDelimiter);
 
 /*
  mailimap_fetch_mailbox_status()
@@ -131,8 +134,8 @@ int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list* pMailbox,
  @param rUidNext  next UID for that mailbox
 */
 LIBETPAN_EXPORT
-int mailimap_fetch_mailbox_status(struct mailimap* pSession,
-                                  const char* pMailbox,
+int mailimap_fetch_mailbox_status(struct mailimap *pSession,
+                                  const char *pMailbox,
                                   struct mailimap_status_bridge *rStatus);
   
 /*
@@ -144,9 +147,9 @@ int mailimap_fetch_mailbox_status(struct mailimap* pSession,
  @param rFlags    List of attributes and flags attached of the mailbox
 */
 LIBETPAN_EXPORT
-int mailimap_fetch_mailbox_info(struct mailimap* pSession,
-                                const char* pMailbox,
-                                struct mailimap_mailbox_info_bridge* rInfo,
+int mailimap_fetch_mailbox_info(struct mailimap *pSession,
+                                const char *pMailbox,
+                                struct mailimap_mailbox_info_bridge *rInfo,
                                 char **rFlags);
 
 /*
@@ -186,7 +189,7 @@ int mailimap_run_search(struct mailimap *pSession,
  @param   pContext: integer that will be passed to the callback
 */
 LIBETPAN_EXPORT
-int mailimap_fetch_email_details(mailimap * pSession,
+int mailimap_fetch_email_details(mailimap *pSession,
                                  struct mailimap_set *pSet,
                                  fetch_email_details_callback *pCallback,
                                  uint32_t pContext);
