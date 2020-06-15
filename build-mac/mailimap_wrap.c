@@ -211,6 +211,81 @@ void __concatenateFlags(struct mailimap_flag *pFlag, char **xString)
 // Exported functions
 //////////
 
+typedef struct error_label
+{
+  int el_enum;
+  const char *el_label;
+} error_label;
+
+const error_label error_name_map[] =
+{
+  {MAILIMAP_NO_ERROR, "no error"},
+  {MAILIMAP_NO_ERROR_AUTHENTICATED, "no error - authenticated"},
+  {MAILIMAP_NO_ERROR_NON_AUTHENTICATED, "no error - non authenticated"},
+  {MAILIMAP_ERROR_BAD_STATE, "bad state"},
+  {MAILIMAP_ERROR_STREAM, "stream error"},
+  {MAILIMAP_ERROR_PARSE, "parse error"},
+  {MAILIMAP_ERROR_CONNECTION_REFUSED, "connection refused"},
+  {MAILIMAP_ERROR_MEMORY, "memory error"},
+  {MAILIMAP_ERROR_FATAL, "fatal error"},
+  {MAILIMAP_ERROR_PROTOCOL, "protocol error"},
+  {MAILIMAP_ERROR_DONT_ACCEPT_CONNECTION, "don't accept connection"},
+  {MAILIMAP_ERROR_APPEND, "command APPEND error"},
+  {MAILIMAP_ERROR_NOOP, "command NOOP"},
+  {MAILIMAP_ERROR_LOGOUT, "command LOGOUT error"},
+  {MAILIMAP_ERROR_CAPABILITY, "command CAPABILITY error"},
+  {MAILIMAP_ERROR_CHECK, "check error"},
+  {MAILIMAP_ERROR_CLOSE, "command CLOSE error"},
+  {MAILIMAP_ERROR_EXPUNGE, "command EXPUNGE error"},
+  {MAILIMAP_ERROR_COPY, "command COPY error"},
+  {MAILIMAP_ERROR_UID_COPY, "command UID COPY error"},
+  {MAILIMAP_ERROR_MOVE, "command MOVE error"},
+  {MAILIMAP_ERROR_UID_MOVE, "command UID MOVE error"},
+  {MAILIMAP_ERROR_CREATE, "command CREATE error"},
+  {MAILIMAP_ERROR_DELETE, "command DELETE error"},
+  {MAILIMAP_ERROR_EXAMINE, "command EXAMINE error"},
+  {MAILIMAP_ERROR_FETCH, "command FETCH error"},
+  {MAILIMAP_ERROR_UID_FETCH, "command UID FETCH error"},
+  {MAILIMAP_ERROR_LIST, "command LIST error"},
+  {MAILIMAP_ERROR_LOGIN, "command LOGIN error"},
+  {MAILIMAP_ERROR_LSUB, "command LSUB error"},
+  {MAILIMAP_ERROR_RENAME, "command RENAME error"},
+  {MAILIMAP_ERROR_SEARCH, "command SEARCH error"},
+  {MAILIMAP_ERROR_UID_SEARCH, "command UID SEARCH error"},
+  {MAILIMAP_ERROR_SELECT, "command SELECT error"},
+  {MAILIMAP_ERROR_STATUS, "command STATUS error"},
+  {MAILIMAP_ERROR_STORE, "command STORE error"},
+  {MAILIMAP_ERROR_UID_STORE, "command UID STORE error"},
+  {MAILIMAP_ERROR_SUBSCRIBE, "command SUBSCRIBE error"},
+  {MAILIMAP_ERROR_UNSUBSCRIBE, "command UNSUBSCRIBE error"},
+  {MAILIMAP_ERROR_STARTTLS, "starttls error"},
+  {MAILIMAP_ERROR_INVAL, "inval error"},
+  {MAILIMAP_ERROR_EXTENSION, "extension error"},
+  {MAILIMAP_ERROR_SASL, "sasl error"},
+  {MAILIMAP_ERROR_SSL, "ssl error"},
+  {MAILIMAP_ERROR_NEEDS_MORE_DATA, "needs more data"},
+  {MAILIMAP_ERROR_CUSTOM_COMMAND, "custom command error"},
+  {MAILIMAP_ERROR_CLIENTID, "client ID error"}
+};
+
+LIBETPAN_EXPORT
+void mailimap_get_error_label(int pErrorCode, char **rLabel)
+{
+  uint32_t tSize = sizeof(error_name_map) / sizeof(error_name_map[0]);
+  char *tLabel = NULL;
+  
+  for (uint32_t i = 0; i < tSize; i++)
+  {
+    if (error_name_map[i].el_enum == pErrorCode)
+      tLabel = strdup(error_name_map[i].el_label);
+  }
+  
+  if (tLabel == NULL)
+    tLabel = strdup("cannot find error code");
+  
+  *rLabel = tLabel;
+}
+
 typedef struct search_flag
 {
   const char *sf_name;

@@ -102,6 +102,14 @@ struct mailimap_msg_att_fetch_callback {
   
   
 /*
+ mailimap_get_error_label()
+ This function returns the label of an error code returned by mailimap API
+*/
+LIBETPAN_EXPORT
+void mailimap_get_error_label(int pErrorCode, char **rLabel);
+  
+  
+/*
  this function creats a condition structure to match messages with pFlag
  Note that the pFlag must be all in capital letters
  
