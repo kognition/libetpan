@@ -692,7 +692,7 @@ void __msg_att_handler(struct mailimap_msg_att * pMsgAtt, void * pContext)
     if (tDetails.ed_internalDate != NULL)
     {
       int tDateLength;
-      tDateLength = snprintf(NULL, 0, "%u,%u,%u,%u,%u,%u,%u",
+      tDateLength = snprintf(NULL, 0, "%i,%i,%i,%i,%i,%i,%i",
                              tDetails.ed_internalDate->dt_year,
                              tDetails.ed_internalDate->dt_month,
                              tDetails.ed_internalDate->dt_day,
@@ -708,7 +708,7 @@ void __msg_att_handler(struct mailimap_msg_att * pMsgAtt, void * pContext)
     
       if (tDateItems != NULL)
       {
-        if (snprintf(tDateItems, tDateLength + 1, "%u,%u,%u,%u,%u,%u,%u",
+        if (snprintf(tDateItems, tDateLength + 1, "%i,%i,%i,%i,%i,%i,%i",
                      tDetails.ed_internalDate->dt_year,
                      tDetails.ed_internalDate->dt_month,
                      tDetails.ed_internalDate->dt_day,
