@@ -343,36 +343,39 @@ int mailimap_fetch_mailbox_details(struct mailimap_mailbox_list *pMailbox,
   
   char *tFlagList = NULL;
   
-  if (tFlags->mbf_type == MAILIMAP_MBX_LIST_FLAGS_SFLAG)
+  if (tFlags != NULL)
   {
-    if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_ERROR)
-      return MAILIMAP_ERROR_LIST;
-    else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_MARKED)
-      __concatToList("Marked", &tFlagList);
-    else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_NOSELECT)
-      __concatToList("Noselect", &tFlagList);
-    else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_UNMARKED)
-      __concatToList("Unmarked", &tFlagList);
-  }
-  
-  if (tFlags->mbf_oflags != NULL)
-  {
-    clistiter* iter = clist_begin(tFlags->mbf_oflags);
-    for (; iter != NULL && tErrorCode == MAILIMAP_NO_ERROR; iter = clist_next(iter))
+    if (tFlags->mbf_type == MAILIMAP_MBX_LIST_FLAGS_SFLAG)
     {
-      struct mailimap_mbx_list_oflag *tOflag = clist_content(iter);
-      
-      if(tOflag == NULL)
-        continue;
-      
-      if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_ERROR)
-        tErrorCode = MAILIMAP_ERROR_LIST;
-      else if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_NOINFERIORS)
-        __concatToList("NoInferior", &tFlagList);
-      else if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_FLAG_EXT)
-        __concatToList(tOflag->of_flag_ext, &tFlagList);
-      else
-        tErrorCode = MAILIMAP_ERROR_LIST;
+      if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_ERROR)
+        return MAILIMAP_ERROR_LIST;
+      else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_MARKED)
+        __concatToList("Marked", &tFlagList);
+      else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_NOSELECT)
+        __concatToList("Noselect", &tFlagList);
+      else if (tFlags->mbf_sflag == MAILIMAP_MBX_LIST_SFLAG_UNMARKED)
+        __concatToList("Unmarked", &tFlagList);
+    }
+    
+    if (tFlags->mbf_oflags != NULL)
+    {
+      clistiter* iter = clist_begin(tFlags->mbf_oflags);
+      for (; iter != NULL && tErrorCode == MAILIMAP_NO_ERROR; iter = clist_next(iter))
+      {
+        struct mailimap_mbx_list_oflag *tOflag = clist_content(iter);
+        
+        if(tOflag == NULL)
+          continue;
+        
+        if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_ERROR)
+          tErrorCode = MAILIMAP_ERROR_LIST;
+        else if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_NOINFERIORS)
+          __concatToList("NoInferior", &tFlagList);
+        else if (tOflag->of_type == MAILIMAP_MBX_LIST_OFLAG_FLAG_EXT)
+          __concatToList(tOflag->of_flag_ext, &tFlagList);
+        else
+          tErrorCode = MAILIMAP_ERROR_LIST;
+      }
     }
   }
   
